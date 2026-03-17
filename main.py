@@ -48,13 +48,48 @@ def get_portfolio():
 
 
 def analyze_stock(ticker):
-    # Dummy logic (replace with real API)
-    return {
-        "ticker": ticker,
-        "trend": "bullish",
-        "risk": "medium",
-        "recommendation": "hold"
-    }
+    # Try to fetch real market data via yfinance. If unavailable, fall back to dummy.
+    try:
+        import yfinance as yf
+        import numpy as np
+
+        tk = yf.Ticker(ticker)
+        hist = tk.history(period="90d")
+        closes = hist['Close'].dropna()
+
+        if len(closes) < 2:
+            raise ValueError('not enough data')
+
+        # Simple trend: percentage change over the window
+        trend_pct = (float(closes.iloc[-1]) - float(closes.iloc[0])) / float(closes.iloc[0])
+
+        # Volatility: std of daily returns
+        returns = closes.pct_change().dropna()
+        volatility = float(returns.std()) if len(returns) > 0 else 0.0
+
+        # Basic recommendation logic
+        if trend_pct > 0.05 and volatility < 0.05:
+            recommendation = 'buy'
+        elif trend_pct < -0.05 and volatility > 0.07:
+            recommendation = 'sell'
+        else:
+            recommendation = 'hold'
+
+        return {
+            "ticker": ticker,
+            "last_price": float(closes.iloc[-1]),
+            "trend_pct": round(trend_pct, 4),
+            "volatility": round(volatility, 4),
+            "recommendation": recommendation
+        }
+    except Exception:
+        # Fallback to previous dummy output if yfinance isn't installed or data missing
+        return {
+            "ticker": ticker,
+            "trend": "bullish",
+            "risk": "medium",
+            "recommendation": "hold"
+        }
 
 
 def rebalance_portfolio():
