@@ -13,9 +13,9 @@ import json
 
 # Optional: load environment variables from a .env file during development
 try:
-    from dotenv import load_dotenv
+    from dotenv import load_dotenv  # type: ignore
     load_dotenv()
-except Exception:
+except ImportError:
     # dotenv not installed or no .env present — that's fine in production
     pass
 
@@ -150,7 +150,8 @@ app = FastAPI()
 # Allow local frontend (Vite) to access the API during development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    # Allow common local dev origins (Vite uses localhost or network IP)
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://192.168.1.180:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
