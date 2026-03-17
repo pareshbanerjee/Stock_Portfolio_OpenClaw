@@ -241,6 +241,23 @@ def root():
     return {"message": "OpenClaw-style agent running"}
 
 
+@app.get("/portfolio/analyze")
+def portfolio_analyze():
+    """Return current portfolio plus per-holding analysis (price, trend, recommendation)."""
+    portfolio = get_portfolio()
+    stocks = portfolio.get("stocks", []) if isinstance(portfolio, dict) else []
+    analyses = []
+    for s in stocks:
+        ticker = s.get("ticker") if isinstance(s, dict) else None
+        if not ticker:
+            continue
+        # call analyze_stock to fetch current data / recommendation
+        analysis = analyze_stock(ticker)
+        analyses.append({"ticker": ticker, "analysis": analysis})
+
+    return {"portfolio": portfolio, "analyses": analyses}
+
+
 # =============================
 # OPTIONAL: REAL OPENAI INTEGRATION
 # =============================
