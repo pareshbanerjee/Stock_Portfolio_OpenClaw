@@ -11,6 +11,17 @@ from pydantic import BaseModel
 import os
 import json
 
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
+try:
+    from yfinance import Ticker
+    import yfinance as yf
+except ImportError:
+    yf = None
+
 # Optional: load environment variables from a .env file during development
 try:
     from dotenv import load_dotenv  # type: ignore
@@ -170,10 +181,33 @@ def run_agent(goal):
 
         result = execute_tool(action, input_data)
 
+        # record the tool execution
         context.append({
             "action": action,
             "result": result
         })
+
+        # If we just retrieved the portfolio, enrich context by analyzing
+        # each holding (current value + recommendation) so the agent can
+        # reason over up-to-date market information.
+        if action == "get_portfolio" and isinstance(result, dict):
+            stocks = result.get("stocks") or []
+            analyses = []
+            for s in stocks:
+                ticker = s.get("ticker")
+                if not ticker:
+                    continue
+                analysis = execute_tool("analyze_stock", ticker)
+                analyses.append({"ticker": ticker, "analysis": analysis})
+                # also record each analysis as a step in the context
+                context.append({
+                    "action": "analyze_stock",
+                    "ticker": ticker,
+                    "result": analysis
+                })
+
+            # attach analyses summary to the last portfolio step for convenience
+            context[-(len(analyses)+1)]["result"]["analyses"] = analyses
 
 
 # =============================
