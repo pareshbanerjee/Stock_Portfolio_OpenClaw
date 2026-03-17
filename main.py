@@ -11,10 +11,22 @@ from pydantic import BaseModel
 import os
 import json
 
+# Optional: load environment variables from a .env file during development
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    # dotenv not installed or no .env present — that's fine in production
+    pass
+
 # =============================
 # CONFIG
 # =============================
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    # Helpful message when running locally without the key set
+    # (do not print keys or store them in code)
+    pass
 
 # =============================
 # MOCK DATA (replace with DB later)
