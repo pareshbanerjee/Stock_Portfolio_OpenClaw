@@ -1,0 +1,21 @@
+1. Run the Server
+uvicorn main:app --reload
+
+2. Open in Browser
+http://127.0.0.1:8000/docs
+
+3. Test Agent
+Click:
+POST /agent/run
+Click “Try it out”
+Paste:
+{
+  "goal": "Optimize my portfolio"
+}
+Click Execute
+
+4. What you’ll see
+The agent will:
+Fetch portfolio
+Rebalance it
+Return steps + result
