@@ -1,15 +1,23 @@
-# =============================
-# OpenClaw-Style Portfolio Agent
-# Backend: FastAPI + Simple Agent Loop
-# Run: pip install fastapi uvicorn openai
-# Then: uvicorn main:app --reload
-# =============================
-
+#!/usr/bin/env python3
+# OpenClaw-Style Portfolio Agent (cleaned)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 import os
 import json
+import time
+
+try:
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv()
+except Exception:
+    pass
+
+try:
+    from openai import OpenAI
+except Exception:
+    OpenAI = None
 
 try:
     import numpy as np
@@ -17,38 +25,26 @@ except ImportError:
     np = None
 
 try:
-    from yfinance import Ticker
     import yfinance as yf
 except ImportError:
     yf = None
-
-# Optional: load environment variables from a .env file during development
-try:
-    from dotenv import load_dotenv  # type: ignore
-    load_dotenv()
-except ImportError:
-    # dotenv not installed or no .env present — that's fine in production
-    pass
 
 # =============================
 # CONFIG
 # =============================
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    # Helpful message when running locally without the key set
-    # (do not print keys or store them in code)
-    pass
 
 # =============================
 # MOCK DATA (replace with DB later)
 # =============================
 portfolio_db = {
     "stocks": [
-        {"ticker": "AAPL", "value": 50000},
-        {"ticker": "TSLA", "value": 30000},
-        {"ticker": "MSFT", "value": 20000}
+        {"ticker": "AAPL", "cost_basis": 50000, "quantity": 200},
+        {"ticker": "TSLA", "cost_basis": 30000, "quantity": 75},
+        {"ticker": "MSFT", "cost_basis": 20000, "quantity": 50},
     ]
 }
+
 
 # =============================
 # TOOLS
@@ -61,54 +57,41 @@ def get_portfolio():
 def analyze_stock(ticker):
     # Try to fetch real market data via yfinance. If unavailable, fall back to dummy.
     try:
-        import yfinance as yf
-        import numpy as np
-
+        import yfinance as yf  # local import for safety
         tk = yf.Ticker(ticker)
         hist = tk.history(period="90d")
-        closes = hist['Close'].dropna()
+        closes = hist.get("Close")
+        if closes is None:
+            raise ValueError("no close prices")
+        closes = closes.dropna()
 
         if len(closes) < 2:
-            raise ValueError('not enough data')
+            raise ValueError("not enough data")
 
-        # Simple trend: percentage change over the window
         trend_pct = (float(closes.iloc[-1]) - float(closes.iloc[0])) / float(closes.iloc[0])
-
-        # Volatility: std of daily returns
         returns = closes.pct_change().dropna()
         volatility = float(returns.std()) if len(returns) > 0 else 0.0
 
-        # Basic recommendation logic
         if trend_pct > 0.05 and volatility < 0.05:
-            recommendation = 'buy'
+            recommendation = "buy"
         elif trend_pct < -0.05 and volatility > 0.07:
-            recommendation = 'sell'
+            recommendation = "sell"
         else:
-            recommendation = 'hold'
+            recommendation = "hold"
 
         return {
             "ticker": ticker,
             "last_price": float(closes.iloc[-1]),
             "trend_pct": round(trend_pct, 4),
             "volatility": round(volatility, 4),
-            "recommendation": recommendation
+            "recommendation": recommendation,
         }
     except Exception:
-        # Fallback to previous dummy output if yfinance isn't installed or data missing
-        return {
-            "ticker": ticker,
-            "trend": "bullish",
-            "risk": "medium",
-            "recommendation": "hold"
-        }
+        return {"ticker": ticker, "recommendation": "hold"}
 
 
 def rebalance_portfolio():
-    return {
-        "AAPL": 0.4,
-        "TSLA": 0.3,
-        "MSFT": 0.3
-    }
+    return {"AAPL": 0.4, "TSLA": 0.3, "MSFT": 0.3}
 
 
 def execute_trade(action):
@@ -133,63 +116,115 @@ def execute_tool(action, input_data=None):
 
 
 # =============================
-# LLM CALL (mock for now)
-# Replace with real OpenAI call later
+# LLM (OpenAI) INTEGRATION
 # =============================
 
+SYSTEM_PROMPT = (
+    "You are a portfolio management assistant.\n"
+    "Given a user goal and tool execution context, decide the next step.\n"
+    "Return a single JSON object with the keys: 'thought', 'action', 'action_input'.\n"
+    "Valid actions: get_portfolio, analyze_stock, rebalance_portfolio, execute_trade, finish.\n"
+    "Only return JSON — do not add extra explanation text.\n"
+)
+
+
 def llm_call(goal, context):
-    # VERY SIMPLE RULE-BASED MOCK
-    if not context:
-        return {
-            "thought": "Need to see portfolio",
-            "action": "get_portfolio",
-            "action_input": None
-        }
+    """Call OpenAI chat completion to decide next action.
 
-    if len(context) == 1:
-        return {
-            "thought": "Rebalance portfolio",
-            "action": "rebalance_portfolio",
-            "action_input": None
-        }
+    Falls back to a small rule-based mock when OpenAI isn't available or no API key.
+    """
+    # Fallback to mock if no OpenAI client or API key
+    if OpenAI is None or not OPENAI_API_KEY:
+        if not context:
+            return {"thought": "Need to see portfolio", "action": "get_portfolio", "action_input": None}
+        if len(context) == 1:
+            return {"thought": "Rebalance portfolio", "action": "rebalance_portfolio", "action_input": None}
+        return {"thought": "Done", "action": "finish", "action_input": "Portfolio optimized"}
 
-    return {
-        "thought": "Done",
-        "action": "finish",
-        "action_input": "Portfolio optimized"
-    }
+    try:
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": f"Goal:\n{goal}"},
+            {"role": "assistant", "content": json.dumps(context)},
+        ]
+
+        resp = client.chat.completions.create(model="gpt-4o-mini", messages=messages, temperature=0.2, max_tokens=512)
+
+        content = resp.choices[0].message.content
+        try:
+            return json.loads(content)
+        except Exception:
+            import re
+
+            m = re.search(r"\{.*\}", content, re.S)
+            if m:
+                try:
+                    return json.loads(m.group(0))
+                except Exception:
+                    pass
+
+        return {"thought": "LLM returned unparsable output", "action": "finish", "action_input": content}
+
+    except Exception as e:
+        return {"thought": f"OpenAI request failed: {str(e)}", "action": "finish", "action_input": "error"}
 
 
 # =============================
 # AGENT LOOP
 # =============================
 
-def run_agent(goal):
+
+def run_agent(goal, max_steps: int = 20, max_seconds: int = 30):
+    """Run the agent loop with safe limits.
+
+    - `max_steps` limits the number of tool executions (default 20).
+    - `max_seconds` limits wall-clock time for the run (default 30s).
+    Returns a result with steps collected so far if a limit is reached.
+    """
     context = []
+    start = time.time()
+    steps = 0
 
     while True:
-        response = llm_call(goal, context)
+        if steps >= max_steps:
+            duration = time.time() - start
+            # find last portfolio snapshot in context
+            last_portfolio = None
+            for i in range(len(context) - 1, -1, -1):
+                if context[i].get("action") == "get_portfolio":
+                    last_portfolio = context[i].get("result")
+                    break
+            return {"result": {"thought": "max_steps_reached", "action": "finish", "action_input": "max_steps"}, "last_portfolio": last_portfolio, "duration_seconds": duration}
+        if time.time() - start > max_seconds:
+            duration = time.time() - start
+            last_portfolio = None
+            for i in range(len(context) - 1, -1, -1):
+                if context[i].get("action") == "get_portfolio":
+                    last_portfolio = context[i].get("result")
+                    break
+            return {"result": {"thought": "max_time_exceeded", "action": "finish", "action_input": "timeout"}, "last_portfolio": last_portfolio, "duration_seconds": duration}
 
-        action = response["action"]
+        response = llm_call(goal, context)
+        action = response.get("action")
         input_data = response.get("action_input")
 
         if action == "finish":
-            return {
-                "result": response,
-                "steps": context
-            }
+            duration = time.time() - start
+            last_portfolio = None
+            for i in range(len(context) - 1, -1, -1):
+                if context[i].get("action") == "get_portfolio":
+                    last_portfolio = context[i].get("result")
+                    break
+            return {"result": response, "last_portfolio": last_portfolio, "duration_seconds": duration}
 
         result = execute_tool(action, input_data)
 
         # record the tool execution
-        context.append({
-            "action": action,
-            "result": result
-        })
+        context.append({"action": action, "result": result})
+        steps += 1
 
-        # If we just retrieved the portfolio, enrich context by analyzing
-        # each holding (current value + recommendation) so the agent can
-        # reason over up-to-date market information.
+        # If we just retrieved the portfolio, enrich context by analyzing each holding
         if action == "get_portfolio" and isinstance(result, dict):
             stocks = result.get("stocks") or []
             analyses = []
@@ -199,15 +234,14 @@ def run_agent(goal):
                     continue
                 analysis = execute_tool("analyze_stock", ticker)
                 analyses.append({"ticker": ticker, "analysis": analysis})
-                # also record each analysis as a step in the context
-                context.append({
-                    "action": "analyze_stock",
-                    "ticker": ticker,
-                    "result": analysis
-                })
+                context.append({"action": "analyze_stock", "ticker": ticker, "result": analysis})
+                steps += 1
 
-            # attach analyses summary to the last portfolio step for convenience
-            context[-(len(analyses)+1)]["result"]["analyses"] = analyses
+            # attach analyses summary to the most recent portfolio step for convenience
+            for i in range(len(context) - 1, -1, -1):
+                if context[i].get("action") == "get_portfolio":
+                    context[i]["result"]["analyses"] = analyses
+                    break
 
 
 # =============================
@@ -216,11 +250,9 @@ def run_agent(goal):
 
 app = FastAPI()
 
-# Allow local frontend (Vite) to access the API during development
 app.add_middleware(
     CORSMiddleware,
-    # Allow common local dev origins (Vite uses localhost or network IP)
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://192.168.1.180:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -229,11 +261,18 @@ app.add_middleware(
 
 class AgentRequest(BaseModel):
     goal: str
+    max_steps: Optional[int] = 20
+    max_seconds: Optional[int] = 30
 
 
 @app.post("/agent/run")
 def run_agent_api(req: AgentRequest):
-    return run_agent(req.goal)
+    """Run the agent with optional per-call overrides for limits.
+
+    Returns the agent result plus per-step logs and the run duration.
+    """
+    out = run_agent(req.goal, max_steps=req.max_steps or 20, max_seconds=req.max_seconds or 30)
+    return out
 
 
 @app.get("/")
@@ -243,7 +282,6 @@ def root():
 
 @app.get("/portfolio/analyze")
 def portfolio_analyze():
-    """Return current portfolio plus per-holding analysis (price, trend, recommendation)."""
     portfolio = get_portfolio()
     stocks = portfolio.get("stocks", []) if isinstance(portfolio, dict) else []
     analyses = []
@@ -251,36 +289,10 @@ def portfolio_analyze():
         ticker = s.get("ticker") if isinstance(s, dict) else None
         if not ticker:
             continue
-        # call analyze_stock to fetch current data / recommendation
         analysis = analyze_stock(ticker)
         analyses.append({"ticker": ticker, "analysis": analysis})
-
     return {"portfolio": portfolio, "analyses": analyses}
 
 
-# =============================
-# OPTIONAL: REAL OPENAI INTEGRATION
-# =============================
-
-'''
-from openai import OpenAI
-client = OpenAI(api_key=OPENAI_API_KEY)
-
-SYSTEM_PROMPT = """
-You are a portfolio agent.
-Return JSON with: thought, action, action_input
-"""
-
-
-def llm_call(goal, context):
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": goal},
-            {"role": "assistant", "content": json.dumps(context)}
-        ]
-    )
-
-    return json.loads(response.choices[0].message.content)
-'''
+if __name__ == "__main__":
+    print("Run via: uvicorn main:app --reload --port 8001")

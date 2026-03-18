@@ -4,3 +4,28 @@ body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvet
 button{ background:#0ea5e9; color:white; border:none; padding:10px 14px; border-radius:6px; cursor:pointer; }
 button:disabled{ opacity:0.6; cursor:default }
 .result{ background:#0f172a; color:#e6eef8; padding:12px; border-radius:6px; white-space:pre-wrap; }
+
+/* Analysis table styles */
+.analysis-table{ width:100%; border-collapse:collapse; margin-top:16px; }
+.analysis-table th, .analysis-table td{ padding:10px 12px; text-align:left; border-bottom:1px solid #e6eef833; }
+.analysis-table thead th{ background:#f1f5f9; font-weight:600; color:#0f172a; }
+.analysis-table tbody tr:nth-child(odd){ background:#ffffff; }
+.analysis-table tbody tr:nth-child(even){ background:#fbfdff; }
+.analysis-table tbody tr:hover{ background:#eef8ff; }
+.analysis-table td{ font-size:0.95rem; color:#0f172a; }
+
+.summary{ margin-top:12px; margin-bottom:8px; color:#0f172a; }
+.error{ color:#b91c1c; background:#ffe4e6; padding:8px 10px; border-radius:6px; margin-top:8px; }
+
+@media (max-width: 640px){
+	.analysis-table th, .analysis-table td{ padding:8px; font-size:0.9rem }
+}
+
+/* Agent run table styles */
+.agent-table{ width:100%; border-collapse:collapse; margin-top:12px; }
+.agent-table th, .agent-table td{ padding:10px 12px; text-align:left; border-bottom:1px solid #e6eef833; vertical-align:top }
+.agent-table thead th{ background:#f8fafc; font-weight:600 }
+.agent-table pre{ margin:0; white-space:pre-wrap; font-family:inherit; font-size:0.9rem }
+.agent-table td:first-child{ width:48px }
+.agent-table td:nth-child(3){ width:140px; color:#0f172a }
+.agent-table tbody tr:hover{ background:#f1f9ff }
