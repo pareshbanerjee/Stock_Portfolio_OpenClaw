@@ -8,13 +8,65 @@ export default function App() {
   const [analyses, setAnalyses] = useState(null)
   const [maxSteps, setMaxSteps] = useState(20)
   const [maxSeconds, setMaxSeconds] = useState(30)
+  const [portfolio, setPortfolio] = useState(null)
+  const [newTicker, setNewTicker] = useState('')
+  const [newQuantity, setNewQuantity] = useState(0)
+  const [newCostBasis, setNewCostBasis] = useState(0)
+  const [editingTicker, setEditingTicker] = useState(null)
+  const [currentEdit, setCurrentEdit] = useState({ quantity: 0, cost_basis: 0 })
 
   useEffect(() => {
     fetch('http://localhost:8001/')
       .then((r) => r.json())
       .then((d) => setMsg(d.message))
-      .catch(() => setMsg('Backend not reachable'))
+      .catch((err) => {
+        console.error('Backend root fetch failed:', err)
+        setMsg('Backend not reachable')
+      })
+
+    // load portfolio for management UI using the shared helper
+    refreshPortfolio()
   }, [])
+
+  async function refreshPortfolio() {
+    try {
+      const res = await fetch('http://localhost:8001/portfolio')
+      const json = await res.json()
+      setPortfolio(json.portfolio)
+    } catch (e) {
+      setPortfolio(null)
+    }
+  }
+
+  async function upsertStock(stock) {
+    try {
+      const res = await fetch('http://localhost:8001/portfolio/stock', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(stock)
+      })
+      const json = await res.json()
+      setPortfolio(json.portfolio)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  async function deleteStock(ticker) {
+    try {
+      const res = await fetch(`http://localhost:8001/portfolio/stock/${ticker}`, { method: 'DELETE' })
+      const json = await res.json()
+      setPortfolio(json.portfolio)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  async function addNewStock() {
+    const stock = { ticker: newTicker.toUpperCase(), quantity: Number(newQuantity), cost_basis: Number(newCostBasis) }
+    await upsertStock(stock)
+    setNewTicker('')
+    setNewQuantity(0)
+    setNewCostBasis(0)
+  }
 
   async function runAgent() {
     setRunningAgent(true)
@@ -67,6 +119,72 @@ export default function App() {
           <input type="number" min={1} value={maxSeconds} onChange={(e) => setMaxSeconds(Number(e.target.value) || 1)} style={{ width: 80 }} />
         </label>
       </div>
+
+      <h2>Manage Portfolio</h2>
+      {portfolio ? (
+        <div>
+          <table className="analysis-table">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Quantity</th>
+                <th>Cost Basis</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(portfolio.stocks || []).map((s) => (
+                <tr key={s.ticker}>
+                  <td className="ticker-col">{s.ticker}</td>
+                  <td>
+                    {editingTicker === s.ticker ? (
+                      <input type="number" value={currentEdit.quantity} onChange={(e) => setCurrentEdit({ ...currentEdit, quantity: e.target.value })} style={{ width: 120 }} />
+                    ) : (
+                      <span>{s.quantity !== undefined ? s.quantity : '-'}</span>
+                    )}
+                  </td>
+                  <td>
+                    {editingTicker === s.ticker ? (
+                      <input type="number" value={currentEdit.cost_basis} onChange={(e) => setCurrentEdit({ ...currentEdit, cost_basis: e.target.value })} style={{ width: 140 }} />
+                    ) : (
+                      <span>{s.cost_basis !== undefined ? `$${Number(s.cost_basis).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</span>
+                    )}
+                  </td>
+                  <td>
+                    {editingTicker === s.ticker ? (
+                      <>
+                        <button className="small-btn" onClick={async () => { await upsertStock({ ticker: s.ticker, quantity: Number(currentEdit.quantity), cost_basis: Number(currentEdit.cost_basis) }); setEditingTicker(null); }}>Save</button>
+                        <button className="small-btn" style={{ marginLeft: 8 }} onClick={() => { setEditingTicker(null); setCurrentEdit({ quantity: 0, cost_basis: 0 }); }}>Cancel</button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="small-btn" onClick={() => { setEditingTicker(s.ticker); setCurrentEdit({ quantity: s.quantity || 0, cost_basis: s.cost_basis || 0 }); }}>Modify</button>
+                        <button className="small-btn" style={{ marginLeft: 8 }} onClick={() => deleteStock(s.ticker)}>Delete</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td>
+                  <input placeholder="TICKER" value={newTicker} onChange={(e) => setNewTicker(e.target.value)} />
+                </td>
+                <td>
+                  <input type="number" value={newQuantity} onChange={(e) => setNewQuantity(e.target.value)} style={{ width: 120 }} />
+                </td>
+                <td>
+                  <input type="number" value={newCostBasis} onChange={(e) => setNewCostBasis(e.target.value)} style={{ width: 140 }} />
+                </td>
+                <td>
+                  <button onClick={addNewStock}>Add</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div>No portfolio loaded</div>
+      )}
       <h2>Agent Result</h2>
       {result && result.error && (
         <div className="error">Error: {result.error}</div>
@@ -132,15 +250,44 @@ export default function App() {
                               <td>{posVal !== undefined ? `$${Number(posVal).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</td>
                             )
                           })()}
-                          <td>{a.trend_pct !== undefined ? (a.trend_pct * 100).toFixed(2) + '%' : '-'}</td>
+                          <td className={a.trend_pct !== undefined && a.trend_pct < 0 ? 'negative' : ''}>{a.trend_pct !== undefined ? (a.trend_pct * 100).toFixed(2) + '%' : '-'}</td>
                           <td>{a.volatility !== undefined ? a.volatility.toFixed(4) : '-'}</td>
-                          <td>{a.recommendation || '-'}</td>
+                          <td className={"rec-" + ((a.recommendation || 'unknown').toString().toLowerCase())}>{a.recommendation || '-'}</td>
                         </tr>
                       )
                     }) : (
                       <tr><td colSpan={8}>No analyses available</td></tr>
                     )}
                   </tbody>
+                  {/* Totals row */}
+                  {analyses.length > 0 && (() => {
+                    const totals = analyses.reduce((acc, row) => {
+                      const a = row.analysis || {}
+                      const stockEntry = (portfolio.stocks || []).find(s => s.ticker === row.ticker) || {}
+                      const lastPrice = a.last_price
+                      const posVal = (stockEntry.quantity !== undefined && lastPrice !== undefined)
+                        ? stockEntry.quantity * lastPrice
+                        : (stockEntry.cost_basis !== undefined ? stockEntry.cost_basis : 0)
+                      acc.cost_basis += stockEntry.cost_basis !== undefined ? Number(stockEntry.cost_basis) : 0
+                      acc.position += posVal !== undefined ? Number(posVal) : 0
+                      return acc
+                    }, { cost_basis: 0, position: 0 })
+
+                    return (
+                      <tfoot>
+                        <tr className="totals-row">
+                          <td style={{ fontWeight: 800 }}>TOTAL</td>
+                          <td></td>
+                          <td></td>
+                          <td style={{ fontWeight: 700 }}>{`$${Number(totals.cost_basis).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}</td>
+                          <td style={{ fontWeight: 700 }}>{`$${Number(totals.position).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}</td>
+                          <td></td>
+                          <td></td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    )
+                  })()}
                 </table>
               </div>
             )
@@ -210,13 +357,42 @@ export default function App() {
                           <td>{posVal !== undefined ? `$${Number(posVal).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</td>
                         )
                       })()}
-                      <td>{a.trend_pct !== undefined ? (a.trend_pct * 100).toFixed(2) + '%' : '-'}</td>
+                      <td className={a.trend_pct !== undefined && a.trend_pct < 0 ? 'negative' : ''}>{a.trend_pct !== undefined ? (a.trend_pct * 100).toFixed(2) + '%' : '-'}</td>
                       <td>{a.volatility !== undefined ? a.volatility.toFixed(4) : '-'}</td>
-                      <td>{a.recommendation || '-'}</td>
+                      <td className={"rec-" + ((a.recommendation || 'unknown').toString().toLowerCase())}>{a.recommendation || '-'}</td>
                   </tr>
                 )
               })}
             </tbody>
+            {/* Totals for portfolio analyses */}
+            {analyses.analyses && analyses.analyses.length > 0 && (() => {
+              const totals = analyses.analyses.reduce((acc, row) => {
+                const a = row.analysis || {}
+                const stockEntry = (analyses.portfolio && analyses.portfolio.stocks || []).find(s => s.ticker === row.ticker) || {}
+                const lastPrice = a.last_price
+                const posVal = (stockEntry.quantity !== undefined && lastPrice !== undefined)
+                  ? stockEntry.quantity * lastPrice
+                  : (stockEntry.cost_basis !== undefined ? stockEntry.cost_basis : 0)
+                acc.cost_basis += stockEntry.cost_basis !== undefined ? Number(stockEntry.cost_basis) : 0
+                acc.position += posVal !== undefined ? Number(posVal) : 0
+                return acc
+              }, { cost_basis: 0, position: 0 })
+
+              return (
+                <tfoot>
+                  <tr className="totals-row">
+                    <td style={{ fontWeight: 800 }}>TOTAL</td>
+                    <td></td>
+                    <td></td>
+                    <td style={{ fontWeight: 700 }}>{`$${Number(totals.cost_basis).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}</td>
+                    <td style={{ fontWeight: 700 }}>{`$${Number(totals.position).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              )
+            })()}
           </table>
         </div>
       )}

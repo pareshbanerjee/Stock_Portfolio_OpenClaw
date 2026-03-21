@@ -4,6 +4,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+from fastapi import Body, HTTPException
+import pathlib
 import os
 import json
 import time
@@ -44,6 +46,36 @@ portfolio_db = {
         {"ticker": "MSFT", "cost_basis": 20000, "quantity": 50},
     ]
 }
+
+# persist portfolio to JSON file so it can be managed via API/UI
+PORTFOLIO_FILE = os.path.join(os.path.dirname(__file__), "portfolio.json")
+
+
+def save_portfolio_to_file():
+    try:
+        with open(PORTFOLIO_FILE, "w") as f:
+            json.dump(portfolio_db, f, indent=2)
+    except Exception:
+        pass
+
+
+def load_portfolio_from_file():
+    global portfolio_db
+    try:
+        if os.path.exists(PORTFOLIO_FILE):
+            with open(PORTFOLIO_FILE, "r") as f:
+                data = json.load(f)
+                if isinstance(data, dict) and "stocks" in data:
+                    portfolio_db = data
+        else:
+            save_portfolio_to_file()
+    except Exception:
+        # keep in-memory default on error
+        pass
+
+
+# initialize from disk if present
+load_portfolio_from_file()
 
 
 # =============================
@@ -292,6 +324,48 @@ def portfolio_analyze():
         analysis = analyze_stock(ticker)
         analyses.append({"ticker": ticker, "analysis": analysis})
     return {"portfolio": portfolio, "analyses": analyses}
+
+
+@app.get("/portfolio")
+def portfolio_get():
+    return {"portfolio": get_portfolio()}
+
+
+@app.post("/portfolio")
+def portfolio_replace(payload: dict = Body(...)):
+    if not isinstance(payload, dict) or "stocks" not in payload:
+        raise HTTPException(status_code=400, detail="payload must include 'stocks'")
+    portfolio_db.clear()
+    portfolio_db.update(payload)
+    save_portfolio_to_file()
+    return {"portfolio": portfolio_db}
+
+
+@app.post("/portfolio/stock")
+def portfolio_upsert(stock: dict = Body(...)):
+    if not stock or not stock.get("ticker"):
+        raise HTTPException(status_code=400, detail="stock with 'ticker' required")
+    stocks = portfolio_db.get("stocks", [])
+    found = False
+    for s in stocks:
+        if s.get("ticker") == stock.get("ticker"):
+            s.update(stock)
+            found = True
+            break
+    if not found:
+        stocks.append(stock)
+    portfolio_db["stocks"] = stocks
+    save_portfolio_to_file()
+    return {"portfolio": portfolio_db}
+
+
+@app.delete("/portfolio/stock/{ticker}")
+def portfolio_delete(ticker: str):
+    stocks = portfolio_db.get("stocks", [])
+    new = [s for s in stocks if s.get("ticker") != ticker]
+    portfolio_db["stocks"] = new
+    save_portfolio_to_file()
+    return {"portfolio": portfolio_db}
 
 
 if __name__ == "__main__":

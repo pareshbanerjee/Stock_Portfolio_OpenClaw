@@ -1,0 +1,66 @@
+{
+  "stocks": [
+    {
+      "ticker": "AAPL",
+      "cost_basis": 40000,
+      "quantity": 200
+    },
+    {
+      "ticker": "TSLA",
+      "cost_basis": 35000,
+      "quantity": 100
+    },
+    {
+      "ticker": "MSFT",
+      "cost_basis": 17500,
+      "quantity": 50
+    },
+    {
+      "ticker": "NVDA",
+      "quantity": 100,
+      "cost_basis": 17000
+    }
+  ],
+  "analyses": [
+    {
+      "ticker": "AAPL",
+      "analysis": {
+        "ticker": "AAPL",
+        "last_price": 247.99000549316406,
+        "trend_pct": -0.0787,
+        "volatility": 0.0136,
+        "recommendation": "hold"
+      }
+    },
+    {
+      "ticker": "TSLA",
+      "analysis": {
+        "ticker": "TSLA",
+        "last_price": 367.9599914550781,
+        "trend_pct": -0.1736,
+        "volatility": 0.0236,
+        "recommendation": "hold"
+      }
+    },
+    {
+      "ticker": "MSFT",
+      "analysis": {
+        "ticker": "MSFT",
+        "last_price": 381.8699951171875,
+        "trend_pct": -0.2422,
+        "volatility": 0.018,
+        "recommendation": "hold"
+      }
+    },
+    {
+      "ticker": "NVDA",
+      "analysis": {
+        "ticker": "NVDA",
+        "last_price": 172.6999969482422,
+        "trend_pct": -0.1323,
+        "volatility": 0.0216,
+        "recommendation": "hold"
+      }
+    }
+  ]
+}
