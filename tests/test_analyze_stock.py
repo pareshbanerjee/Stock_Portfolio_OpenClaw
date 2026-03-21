@@ -2,7 +2,7 @@ import builtins
 from unittest.mock import patch
 import pandas as pd
 
-from main import analyze_stock
+from backend.main import analyze_stock
 
 
 def make_hist(close_values):

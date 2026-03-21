@@ -28,9 +28,9 @@ kill_pid_file .backend.pid
 kill_pid_file .frontend.pid
 
 # Fallback: try to kill uvicorn or vite processes started in this repo
-if pgrep -f "uvicorn main:app" >/dev/null 2>&1; then
-  echo "[stop.sh] Killing any remaining 'uvicorn main:app' processes"
-  pkill -f "uvicorn main:app" || true
+if pgrep -f "uvicorn backend.main:app" >/dev/null 2>&1; then
+  echo "[stop.sh] Killing any remaining 'uvicorn backend.main:app' processes"
+  pkill -f "uvicorn backend.main:app" || true
 fi
 
 if pgrep -f "vite" >/dev/null 2>&1; then

@@ -47,7 +47,8 @@ if port_in_use "$BACKEND_PORT"; then
   echo "[dev.sh] Backend port $BACKEND_PORT already in use — skipping start"
 else
   echo "[dev.sh] Starting backend (uvicorn) on port $BACKEND_PORT"
-  uvicorn main:app --reload --port "$BACKEND_PORT" > logs/backend.log 2>&1 &
+  # backend moved into backend/main.py; run via module path
+  uvicorn backend.main:app --reload --port "$BACKEND_PORT" > logs/backend.log 2>&1 &
   echo $! > .backend.pid
   echo "[dev.sh] Backend started (logs/backend.log)"
 fi
