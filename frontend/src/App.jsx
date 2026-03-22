@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react'
 
 export default function App() {
   // Use Vite environment variable for API base so frontend works when deployed.
-  // Set VITE_API_BASE in Vercel to your backend URL (e.g. https://my-backend.example.com)
-  const API_BASE = (import.meta && import.meta.env && import.meta.env.VITE_API_BASE) || 'http://localhost:8001'
+  // In Vercel, set VITE_API_BASE to the backend URL OR leave unset to use the built-in serverless `/api` routes.
+  const API_BASE = (import.meta && import.meta.env && import.meta.env.VITE_API_BASE) || '/api'
   const [msg, setMsg] = useState('Connecting...')
   const [runningAgent, setRunningAgent] = useState(false)
   const [runningAnalyze, setRunningAnalyze] = useState(false)
