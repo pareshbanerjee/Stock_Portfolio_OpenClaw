@@ -1,8 +1,7 @@
-fastapi
+starlette
 uvicorn
-openai
-python-dotenv
 yfinance
 pandas
 numpy
-pytest
+openai
+python-dotenv

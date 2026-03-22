@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react'
 
 export default function App() {
+  // Use Vite environment variable for API base so frontend works when deployed.
+  // Set VITE_API_BASE in Vercel to your backend URL (e.g. https://my-backend.example.com)
+  const API_BASE = (import.meta && import.meta.env && import.meta.env.VITE_API_BASE) || 'http://localhost:8001'
   const [msg, setMsg] = useState('Connecting...')
   const [runningAgent, setRunningAgent] = useState(false)
   const [runningAnalyze, setRunningAnalyze] = useState(false)
@@ -16,7 +19,7 @@ export default function App() {
   const [currentEdit, setCurrentEdit] = useState({ quantity: 0, cost_basis: 0 })
 
   useEffect(() => {
-    fetch('http://localhost:8001/')
+    fetch(`${API_BASE}/`)
       .then((r) => r.json())
       .then((d) => setMsg(d.message))
       .catch((err) => {
@@ -30,7 +33,7 @@ export default function App() {
 
   async function refreshPortfolio() {
     try {
-      const res = await fetch('http://localhost:8001/portfolio')
+      const res = await fetch(`${API_BASE}/portfolio`)
       const json = await res.json()
       setPortfolio(json.portfolio)
     } catch (e) {
@@ -40,7 +43,7 @@ export default function App() {
 
   async function upsertStock(stock) {
     try {
-      const res = await fetch('http://localhost:8001/portfolio/stock', {
+      const res = await fetch(`${API_BASE}/portfolio/stock`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(stock)
       })
       const json = await res.json()
@@ -52,7 +55,7 @@ export default function App() {
 
   async function deleteStock(ticker) {
     try {
-      const res = await fetch(`http://localhost:8001/portfolio/stock/${ticker}`, { method: 'DELETE' })
+      const res = await fetch(`${API_BASE}/portfolio/stock/${ticker}`, { method: 'DELETE' })
       const json = await res.json()
       setPortfolio(json.portfolio)
     } catch (e) {
@@ -72,7 +75,7 @@ export default function App() {
     setRunningAgent(true)
     setResult(null)
     try {
-      const res = await fetch('http://localhost:8001/agent/run', {
+      const res = await fetch(`${API_BASE}/agent/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ goal: 'Optimize portfolio', max_steps: maxSteps, max_seconds: maxSeconds })
@@ -90,7 +93,7 @@ export default function App() {
     setAnalyses(null)
     setRunningAnalyze(true)
     try {
-      const res = await fetch('http://localhost:8001/portfolio/analyze')
+      const res = await fetch(`${API_BASE}/portfolio/analyze`)
       const json = await res.json()
       setAnalyses(json)
     } catch (e) {
@@ -103,7 +106,7 @@ export default function App() {
 
   return (
     <div className="container">
-      <h1>OpenClaw Portfolio Dashboard</h1>
+      <h1>SmartFolio</h1>
       <p>{msg}</p>
       <div className="controls">
         <button onClick={runAgent} disabled={runningAgent}>{runningAgent ? 'Running...' : 'Analyze Portfolio(LLM)'}</button>
@@ -122,7 +125,7 @@ export default function App() {
 
       <h2>Manage Portfolio</h2>
       {portfolio ? (
-        <div>
+        <div className="table-responsive">
           <table className="analysis-table">
             <thead>
               <tr>
@@ -135,22 +138,22 @@ export default function App() {
             <tbody>
               {(portfolio.stocks || []).map((s) => (
                 <tr key={s.ticker}>
-                  <td className="ticker-col">{s.ticker}</td>
-                  <td>
+                  <td className="ticker-col" data-label="Ticker">{s.ticker}</td>
+                  <td data-label="Quantity">
                     {editingTicker === s.ticker ? (
                       <input type="number" value={currentEdit.quantity} onChange={(e) => setCurrentEdit({ ...currentEdit, quantity: e.target.value })} style={{ width: 120 }} />
                     ) : (
                       <span>{s.quantity !== undefined ? s.quantity : '-'}</span>
                     )}
                   </td>
-                  <td>
+                  <td data-label="Cost Basis">
                     {editingTicker === s.ticker ? (
                       <input type="number" value={currentEdit.cost_basis} onChange={(e) => setCurrentEdit({ ...currentEdit, cost_basis: e.target.value })} style={{ width: 140 }} />
                     ) : (
                       <span>{s.cost_basis !== undefined ? `$${Number(s.cost_basis).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</span>
                     )}
                   </td>
-                  <td>
+                  <td data-label="Actions">
                     {editingTicker === s.ticker ? (
                       <>
                         <button className="small-btn" onClick={async () => { await upsertStock({ ticker: s.ticker, quantity: Number(currentEdit.quantity), cost_basis: Number(currentEdit.cost_basis) }); setEditingTicker(null); }}>Save</button>
@@ -166,16 +169,16 @@ export default function App() {
                 </tr>
               ))}
               <tr>
-                <td>
+                <td data-label="Ticker">
                   <input placeholder="TICKER" value={newTicker} onChange={(e) => setNewTicker(e.target.value)} />
                 </td>
-                <td>
+                <td data-label="Quantity">
                   <input type="number" value={newQuantity} onChange={(e) => setNewQuantity(e.target.value)} style={{ width: 120 }} />
                 </td>
-                <td>
+                <td data-label="Cost Basis">
                   <input type="number" value={newCostBasis} onChange={(e) => setNewCostBasis(e.target.value)} style={{ width: 140 }} />
                 </td>
-                <td>
+                <td data-label="Actions">
                   <button onClick={addNewStock}>Add</button>
                 </td>
               </tr>
@@ -185,7 +188,7 @@ export default function App() {
       ) : (
         <div>No portfolio loaded</div>
       )}
-      <h2>Agent Result</h2>
+      <h2>Portfolio Analysis(LLM Agent)</h2>
       {result && result.error && (
         <div className="error">Error: {result.error}</div>
       )}
@@ -218,6 +221,7 @@ export default function App() {
                   })()}
                 </div>
 
+                <div className="table-responsive">
                 <table className="analysis-table">
                   <thead>
                     <tr>
@@ -237,26 +241,26 @@ export default function App() {
                       const stockEntry = (portfolio.stocks || []).find(s => s.ticker === row.ticker) || {}
                       return (
                         <tr key={row.ticker}>
-                          <td>{row.ticker}</td>
-                          <td>{a.last_price !== undefined ? a.last_price.toFixed(2) : '-'}</td>
-                          <td>{stockEntry.quantity !== undefined ? stockEntry.quantity : '-'}</td>
-                          <td>{stockEntry.cost_basis !== undefined ? `$${Number(stockEntry.cost_basis).toLocaleString()}` : '-'}</td>
+                              <td data-label="Ticker">{row.ticker}</td>
+                              <td data-label="Last Price">{a.last_price !== undefined ? a.last_price.toFixed(2) : '-'}</td>
+                              <td data-label="Quantity">{stockEntry.quantity !== undefined ? stockEntry.quantity : '-'}</td>
+                              <td data-label="Cost Basis">{stockEntry.cost_basis !== undefined ? `$${Number(stockEntry.cost_basis).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</td>
                           {(() => {
                             const lastPrice = a.last_price
                             const posVal = (stockEntry.quantity !== undefined && lastPrice !== undefined)
                               ? stockEntry.quantity * lastPrice
                               : (stockEntry.cost_basis !== undefined ? stockEntry.cost_basis : undefined)
                             return (
-                              <td>{posVal !== undefined ? `$${Number(posVal).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</td>
+                                  <td data-label="Position Value">{posVal !== undefined ? `$${Number(posVal).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</td>
                             )
                           })()}
-                          <td className={a.trend_pct !== undefined && a.trend_pct < 0 ? 'negative' : ''}>{a.trend_pct !== undefined ? (a.trend_pct * 100).toFixed(2) + '%' : '-'}</td>
-                          <td>{a.volatility !== undefined ? a.volatility.toFixed(4) : '-'}</td>
-                          <td className={"rec-" + ((a.recommendation || 'unknown').toString().toLowerCase())}>{a.recommendation || '-'}</td>
+                          <td data-label="Trend %" className={a.trend_pct !== undefined && a.trend_pct < 0 ? 'negative' : ''}>{a.trend_pct !== undefined ? (a.trend_pct * 100).toFixed(2) + '%' : '-'}</td>
+                          <td data-label="Volatility">{a.volatility !== undefined ? a.volatility.toFixed(4) : '-'}</td>
+                          <td data-label="Recommendation" className={"rec-" + ((a.recommendation || 'unknown').toString().toLowerCase())}>{a.recommendation || '-'}</td>
                         </tr>
                       )
                     }) : (
-                      <tr><td colSpan={8}>No analyses available</td></tr>
+                      <tr><td colSpan={8}>No analysis available</td></tr>
                     )}
                   </tbody>
                   {/* Totals row */}
@@ -289,6 +293,7 @@ export default function App() {
                     )
                   })()}
                 </table>
+                </div>
               </div>
             )
           })()}
@@ -301,7 +306,7 @@ export default function App() {
 
       {!result && <div>No result yet</div>}
 
-      <h2>Portfolio Analyses</h2>
+      <h2>Potfoilio Analysis(YFinance)</h2>
       {analyses && analyses.error && (
         <div className="error">Error: {analyses.error}</div>
       )}
@@ -324,6 +329,7 @@ export default function App() {
             })()}
           </div>
 
+          <div className="table-responsive">
           <table className="analysis-table">
             <thead>
               <tr>
@@ -344,22 +350,22 @@ export default function App() {
                 const stockEntry = (analyses.portfolio && analyses.portfolio.stocks || []).find(s => s.ticker === row.ticker) || {}
                 return (
                   <tr key={row.ticker}>
-                      <td>{row.ticker}</td>
-                      <td>{a.last_price !== undefined ? a.last_price.toFixed(2) : '-'}</td>
-                      <td>{stockEntry.quantity !== undefined ? stockEntry.quantity : '-'}</td>
-                      <td>{stockEntry.cost_basis !== undefined ? `$${Number(stockEntry.cost_basis).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</td>
+                      <td data-label="Ticker">{row.ticker}</td>
+                      <td data-label="Last Price">{a.last_price !== undefined ? a.last_price.toFixed(2) : '-'}</td>
+                      <td data-label="Quantity">{stockEntry.quantity !== undefined ? stockEntry.quantity : '-'}</td>
+                      <td data-label="Cost Basis">{stockEntry.cost_basis !== undefined ? `$${Number(stockEntry.cost_basis).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</td>
                       {(() => {
                         const lastPrice = a.last_price
                         const posVal = (stockEntry.quantity !== undefined && lastPrice !== undefined)
                           ? stockEntry.quantity * lastPrice
                           : (stockEntry.cost_basis !== undefined ? stockEntry.cost_basis : undefined)
                         return (
-                          <td>{posVal !== undefined ? `$${Number(posVal).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</td>
+                          <td data-label="Position Value">{posVal !== undefined ? `$${Number(posVal).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '-'}</td>
                         )
                       })()}
-                      <td className={a.trend_pct !== undefined && a.trend_pct < 0 ? 'negative' : ''}>{a.trend_pct !== undefined ? (a.trend_pct * 100).toFixed(2) + '%' : '-'}</td>
-                      <td>{a.volatility !== undefined ? a.volatility.toFixed(4) : '-'}</td>
-                      <td className={"rec-" + ((a.recommendation || 'unknown').toString().toLowerCase())}>{a.recommendation || '-'}</td>
+                      <td data-label="Trend %" className={a.trend_pct !== undefined && a.trend_pct < 0 ? 'negative' : ''}>{a.trend_pct !== undefined ? (a.trend_pct * 100).toFixed(2) + '%' : '-'}</td>
+                      <td data-label="Volatility">{a.volatility !== undefined ? a.volatility.toFixed(4) : '-'}</td>
+                      <td data-label="Recommendation" className={"rec-" + ((a.recommendation || 'unknown').toString().toLowerCase())}>{a.recommendation || '-'}</td>
                   </tr>
                 )
               })}
@@ -394,10 +400,11 @@ export default function App() {
               )
             })()}
           </table>
+          </div>
         </div>
       )}
 
-      {!analyses && <div>No analyses yet</div>}
+      {!analyses && <div>No analysis yet</div>}
     </div>
   )
 }

@@ -19,6 +19,9 @@ body {
 	box-shadow: 0 6px 24px rgba(0,0,0,0.6);
 }
 
+/* Main title styling */
+.container h1 { color: #1E90FF; margin: 0 0 8px 0; font-size: 1.9rem; font-weight: 900; letter-spacing: 0.6px; text-shadow: 0 0 8px rgba(30,144,255,0.22); }
+
 .controls{ margin:10px 0; display:flex; gap:10px; align-items:center; flex-wrap:wrap }
 
 button{
@@ -43,8 +46,8 @@ input, select {
 	font-family: inherit;
 }
 
-.analysis-table{ width:100%; border-collapse:collapse; margin-top:12px; font-size:0.92rem }
-.analysis-table th, .analysis-table td{ padding:8px 10px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.04); }
+.analysis-table{ width:100%; border-collapse:collapse; margin-top:12px; font-size:0.92rem; border: 1px solid rgba(255,210,77,0.14); border-radius:6px; overflow:hidden }
+.analysis-table th, .analysis-table td{ padding:8px 10px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.06); }
 .analysis-table thead th{ background:#071a10; font-weight:700; color:#ffd24d; text-transform:uppercase; letter-spacing:0.04em }
 .analysis-table tbody tr{ background: transparent }
 .analysis-table tbody tr:hover{ background: rgba(0,255,136,0.02) }
@@ -67,9 +70,20 @@ input, select {
 	.analysis-table th, .analysis-table td{ padding:6px 8px; font-size:0.86rem }
 }
 
+/* Card-style table rows for very small screens */
+@media (max-width: 480px) {
+	.analysis-table, .agent-table { border: none; border-radius: 0; }
+	.analysis-table thead, .agent-table thead { display: none; }
+	.analysis-table tbody tr, .agent-table tbody tr { display: block; border: 1px solid rgba(255,255,255,0.04); margin-bottom: 10px; padding: 10px; border-radius: 6px; background: rgba(255,255,255,0.01); }
+	.analysis-table tbody tr td, .agent-table tbody tr td { display: flex; justify-content: space-between; padding: 8px 6px; border-bottom: none; }
+	.analysis-table tbody tr td:before, .agent-table tbody tr td:before { content: attr(data-label); color: #ffd24d; font-weight: 700; margin-right: 8px; width: 45%; display: inline-block; }
+	.analysis-table tbody tr td .rec-buy, .analysis-table tbody tr td .rec-hold, .analysis-table tbody tr td .rec-sell { display: inline; }
+	.table-responsive { overflow-x: visible; }
+}
+
 /* Agent table */
-.agent-table{ width:100%; border-collapse:collapse; margin-top:10px; }
-.agent-table th, .agent-table td{ padding:8px 10px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:top }
+.agent-table{ width:100%; border-collapse:collapse; margin-top:10px; border: 1px solid rgba(255,210,77,0.14); border-radius:6px; overflow:hidden }
+.agent-table th, .agent-table td{ padding:8px 10px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.06); vertical-align:top }
 .agent-table thead th{ background:#071a10; color:#ffd24d; font-weight:700 }
 .agent-table pre{ margin:0; white-space:pre-wrap; font-family:inherit; font-size:0.9rem }
 
@@ -81,10 +95,19 @@ input, select {
 
 /* Totals row separators */
 .analysis-table tfoot tr.totals-row td {
-	border-top: 1px solid rgba(255,255,255,0.08);
-	border-bottom: 1px solid rgba(255,255,255,0.08);
+	border-top: 2px solid rgba(255,210,77,0.22);
+	border-bottom: 2px solid rgba(255,210,77,0.22);
 	padding-top: 10px;
 	padding-bottom: 10px;
-	background: rgba(0,0,0,0.02);
+	background: rgba(255,210,77,0.03);
+	color: #ffd24d;
+}
+
+/* Responsive table wrapper for horizontal scrolling on small devices */
+.table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Increase touch targets on mobile for buttons */
+@media (max-width: 820px) {
+	button, .small-btn { padding: 10px 12px; min-height: 44px; font-size: 1rem; }
 }
 
