@@ -11,3 +11,9 @@ Overview
 - Vercel serverless scaffolding: `api/`
 
 See `README_Vercel.md` for deployment instructions.
+
+DEV RUN:
+Frontend in Dev:
+npm run dev -- --host
+Backend in Dev:
+uvicorn main:app --reload --port 8001
