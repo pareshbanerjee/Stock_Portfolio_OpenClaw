@@ -104,6 +104,10 @@ export default function App() {
     }
   }
 
+  function formatCurrency(amount) {
+    return `$${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+
   return (
     <div className="container">
       <h1>SmartFolio</h1>
@@ -207,17 +211,18 @@ export default function App() {
 
             return (
               <div>
-                <div className="summary"><strong>Portfolio Value:</strong>{' '}
+                  <div className="summary"><strong>Portfolio Value (Current):</strong>{' '}
                   {(() => {
                     if (!portfolio.stocks) return 'n/a'
-                    return portfolio.stocks.reduce((acc, s) => {
+                    const val = portfolio.stocks.reduce((acc, s) => {
                       // compute position value: prefer explicit value, otherwise quantity * last_price
-                      const stockAnalysis = analyses.find(r => r.ticker === s.ticker) || {}
-                      const lastPrice = stockAnalysis.analysis && stockAnalysis.analysis.last_price
-                      if (s.cost_basis !== undefined) return acc + Number(s.cost_basis)
-                      if (s.quantity !== undefined && lastPrice !== undefined) return acc + (s.quantity * lastPrice)
+                          const stockAnalysis = analyses.find(r => r.ticker === s.ticker) || {}
+                          const lastPrice = stockAnalysis.analysis && stockAnalysis.analysis.last_price
+                          if (s.quantity !== undefined && lastPrice !== undefined) return acc + (s.quantity * lastPrice)
+                          if (s.cost_basis !== undefined) return acc + Number(s.cost_basis)
                       return acc
                     }, 0)
+                    return formatCurrency(val)
                   })()}
                 </div>
 
@@ -306,7 +311,7 @@ export default function App() {
 
       {!result && <div>No result yet</div>}
 
-      <h2>Potfoilio Analysis(YFinance)</h2>
+      <h2>Portfolio Analysis (YFinance)</h2>
       {analyses && analyses.error && (
         <div className="error">Error: {analyses.error}</div>
       )}
@@ -314,18 +319,19 @@ export default function App() {
       {analyses && !analyses.error && (
         <div>
             <div className="summary">
-            <strong>Portfolio Value:</strong>{' '}
+            <strong>Portfolio Value (Current):</strong>{' '}
             {(() => {
               const p = analyses.portfolio
               const an = analyses.analyses || []
               if (!p || !p.stocks) return 'n/a'
-              return p.stocks.reduce((acc, s) => {
+              const val = p.stocks.reduce((acc, s) => {
                 const a = an.find(r => r.ticker === s.ticker) || {}
                 const lastPrice = a.analysis && a.analysis.last_price
-                if (s.cost_basis !== undefined) return acc + Number(s.cost_basis)
                 if (s.quantity !== undefined && lastPrice !== undefined) return acc + (s.quantity * lastPrice)
+                if (s.cost_basis !== undefined) return acc + Number(s.cost_basis)
                 return acc
               }, 0)
+              return formatCurrency(val)
             })()}
           </div>
 
